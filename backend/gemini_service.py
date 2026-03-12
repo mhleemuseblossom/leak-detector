@@ -40,7 +40,7 @@ async def generate_keywords(topic: str) -> list[str]:
 
     response = model.generate_content(prompt)
     text = response.text.strip()
-    text='무료 만화'
+    # text='무료 만화'
 
     # JSON 파싱
     json_match = re.search(r'\{.*\}', text, re.DOTALL)
