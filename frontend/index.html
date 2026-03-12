@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL — 정보 유출 탐지 시스템</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #030508;
+    --surface: #080d14;
+    --surface2: #0d1520;
+    --border: #1a2840;
+    --accent: #00d4ff;
+    --accent2: #ff3c6e;
+    --accent3: #7c3aed;
+    --warn: #f59e0b;
+    --ok: #10b981;
+    --text: #c8d8e8;
+    --muted: #4a6480;
+    --glow: rgba(0,212,255,0.15);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  body::after {
+    content:'';
+    position:fixed; inset:0;
+    background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0,212,255,0.08) 0%, transparent 60%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 24px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+    background: rgba(3,5,8,0.8);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    animation: pulse-logo 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-logo {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,212,255,0.4); }
+    50% { box-shadow: 0 0 20px 8px rgba(0,212,255,0.1); }
+  }
+
+  .logo-text {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .logo-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  .status-dot.inactive { background: var(--muted); animation: none; }
+  .status-dot.scanning { background: var(--accent); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── LAYOUT ── */
+  .app {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: 1fr;
+    height: calc(100vh - 73px);
+    gap: 0;
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: rgba(8,13,20,0.5);
+  }
+
+  .scan-panel {
+    padding: 28px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::before {
+    content:'';
+    width: 3px; height: 14px;
+    background: var(--accent);
+    display: block;
+  }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  input, textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    resize: none;
+  }
+
+  input:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+  }
+
+  input::placeholder, textarea::placeholder { color: var(--muted); }
+
+  .field { margin-bottom: 16px; }
+
+  .btn {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #0099cc);
+    color: #000;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,212,255,0.3);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-danger {
+    background: rgba(255,60,110,0.15);
+    color: var(--accent2);
+    border: 1px solid rgba(255,60,110,0.3);
+    margin-top: 8px;
+  }
+
+  .btn-danger:hover { background: rgba(255,60,110,0.25); }
+
+  .btn-scan-anim::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes shimmer { to { transform: translateX(100%); } }
+
+  /* ── LOG PANEL ── */
+  .log-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px 24px;
+  }
+
+  .log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .log-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .log-count {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  .log-body {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 3px 0;
+    animation: log-in 0.2s ease;
+  }
+
+  @keyframes log-in {
+    from { opacity:0; transform: translateX(-8px); }
+    to { opacity:1; transform: translateX(0); }
+  }
+
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-msg { color: var(--text); word-break: break-all; }
+  .log-msg.stage { color: var(--accent); font-weight: 700; }
+  .log-msg.leak_found { color: var(--accent2); }
+  .log-msg.error { color: #ff4444; }
+  .log-msg.done { color: var(--ok); }
+  .log-msg.keywords { color: var(--warn); }
+
+  /* ── MAIN CONTENT ── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: flex;
+    gap: 1px;
+    border-bottom: 1px solid var(--border);
+    background: var(--border);
+  }
+
+  .stat-card {
+    flex: 1;
+    padding: 20px 24px;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    transition: all 0.3s;
+  }
+
+  .stat-value.high { color: var(--accent2); }
+  .stat-value.medium { color: var(--warn); }
+  .stat-value.low { color: var(--ok); }
+  .stat-value.ok { color: var(--ok); }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    background: var(--surface);
+    gap: 4px;
+  }
+
+  .tab {
+    padding: 14px 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-color: var(--accent); }
+
+  /* ── RESULTS ── */
+  .results-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* Leak Cards */
+  .leak-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  .leak-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+    animation: card-in 0.3s ease;
+  }
+
+  @keyframes card-in {
+    from { opacity:0; transform: translateY(12px); }
+    to { opacity:1; transform: translateY(0); }
+  }
+
+  .leak-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+  .leak-card::before {
+    content:'';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+
+  .leak-card.HIGH::before { background: var(--accent2); }
+  .leak-card.MEDIUM::before { background: var(--warn); }
+  .leak-card.LOW::before { background: var(--ok); }
+
+  .leak-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .risk-badge {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .risk-badge.HIGH { background: rgba(255,60,110,0.2); color: var(--accent2); border: 1px solid rgba(255,60,110,0.3); }
+  .risk-badge.MEDIUM { background: rgba(245,158,11,0.2); color: var(--warn); border: 1px solid rgba(245,158,11,0.3); }
+  .risk-badge.LOW { background: rgba(16,185,129,0.2); color: var(--ok); border: 1px solid rgba(16,185,129,0.3); }
+
+  .leak-url {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    word-break: break-all;
+    text-decoration: none;
+  }
+
+  .leak-url:hover { text-decoration: underline; }
+
+  .leak-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .leak-summary {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+
+  .leak-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .leak-type-tag {
+    padding: 3px 8px;
+    background: rgba(124,58,237,0.2);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 3px;
+    font-size: 11px;
+    color: #a78bfa;
+  }
+
+  .score-bar {
+    margin-top: 12px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .score-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s ease;
+  }
+
+  .score-fill.HIGH { background: linear-gradient(90deg, var(--accent2), #ff6b6b); }
+  .score-fill.MEDIUM { background: linear-gradient(90deg, var(--warn), #fcd34d); }
+  .score-fill.LOW { background: linear-gradient(90deg, var(--ok), #34d399); }
+
+  /* Pages tab */
+  .pages-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .pages-table th {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .pages-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(26,40,64,0.5);
+    vertical-align: top;
+  }
+
+  .pages-table tr:hover td { background: var(--surface2); }
+
+  .depth-badge {
+    padding: 2px 6px;
+    background: rgba(0,212,255,0.1);
+    border-radius: 3px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+  }
+
+  /* Keywords display */
+  .keywords-display {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px 0;
+  }
+
+  .kw-tag {
+    padding: 6px 14px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    animation: kw-pop 0.3s ease;
+  }
+
+  @keyframes kw-pop {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 16px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .empty-icon {
+    font-size: 48px;
+    opacity: 0.3;
+  }
+
+  .empty-text {
+    font-size: 13px;
+    line-height: 1.8;
+    max-width: 280px;
+  }
+
+  /* Progress bar */
+  .progress-wrap {
+    margin-top: 16px;
+    display: none;
+  }
+
+  .progress-wrap.visible { display: block; }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .progress-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent3), var(--accent));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+
+  .stage-dots {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    justify-content: center;
+  }
+
+  .stage-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+  }
+
+  .stage-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .stage-dot.done { background: var(--ok); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* Scan animation overlay */
+  .scan-line {
+    position: fixed;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 100;
+    animation: scan-sweep 3s linear infinite;
+  }
+
+  @keyframes scan-sweep {
+    0% { top: 0; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100vh; opacity: 0; }
+  }
+
+  .scan-line.hidden { display: none; }
+
+  /* Session History */
+  .history-list { display: grid; gap: 8px; }
+
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s;
+  }
+
+  .history-item:hover { border-color: var(--accent); background: var(--surface2); }
+
+  .history-topic { font-size: 13px; font-weight: 600; }
+
+  .history-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .history-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: rgba(255,60,110,0.15);
+    color: var(--accent2);
+    flex-shrink: 0;
+  }
+
+  .history-badge.zero { background: rgba(16,185,129,0.15); color: var(--ok); }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .sidebar { height: auto; max-height: 50vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scan-line hidden" id="scanLine"></div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-text">SENTINEL</div>
+      <div class="logo-sub">정보 유출 탐지 시스템 v1.0</div>
+    </div>
+  </div>
+
+</header>
+
+<div class="app">
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="scan-panel">
+      <div class="panel-title">스캔 설정</div>
+
+      <div class="field">
+        <label>탐지 주제</label>
+        <input type="text" id="topicInput" placeholder="예: 무료 만화, 영화 다시보기.." />
+      </div>
+
+      <!-- <div class="field">
+        <label>커스텀 키워드 (선택, 줄바꿈 구분)</label>
+        <textarea id="customKeywords" rows="3" placeholder="키워드1&#10;키워드2&#10;키워드3&#10;(비워두면 Gemini가 자동 생성)"></textarea>
+      </div> -->
+
+      <button class="btn btn-primary" id="startBtn" onclick="startScan()">
+        🔍 스캔 시작
+      </button>
+        <div class="header-status">
+        <div class="status-dot inactive" id="statusDot"></div>
+        <span id="statusText">대기 중</span>
+      </div>
+      <button class="btn btn-danger" id="stopBtn" onclick="stopScan()" style="display:none">
+        ⏹ 스캔 중지
+      </button>
+
+      <div class="progress-wrap" id="progressWrap">
+        <div class="progress-label">
+          <span id="progressLabel">준비 중...</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="stage-dots">
+          <div class="stage-dot" id="dot1" title="키워드 생성"></div>
+          <div class="stage-dot" id="dot2" title="크롤링"></div>
+          <div class="stage-dot" id="dot3" title="DB 저장"></div>
+          <div class="stage-dot" id="dot4" title="유출 분석"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log Panel -->
+    <div class="log-panel">
+      <div class="log-header">
+        <div class="log-title">시스템 로그</div>
+        <div class="log-count" id="logCount">0 events</div>
+      </div>
+      <div class="log-body" id="logBody">
+        <div class="log-entry">
+          <span class="log-time">--:--:--</span>
+          <span class="log-msg">시스템 준비 완료. 스캔을 시작하세요.</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-label">수집 페이지</div>
+        <div class="stat-value" id="statPages">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">키워드</div>
+        <div class="stat-value" id="statKeywords">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">HIGH 위험</div>
+        <div class="stat-value high" id="statHigh">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">MEDIUM 위험</div>
+        <div class="stat-value medium" id="statMedium">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">LOW 위험</div>
+        <div class="stat-value low" id="statLow">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">총 유출 탐지</div>
+        <div class="stat-value" id="statLeaks">0</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('leaks', this)">⚠️ 유출 사이트</div>
+      <div class="tab" onclick="switchTab('pages', this)">📄 수집 텍스트</div>
+      <div class="tab" onclick="switchTab('keywords', this)">🔑 키워드</div>
+      <!-- <div class="tab" onclick="switchTab('history', this)">📁 세션 기록</div> -->
+    </div>
+
+    <!-- Results Area -->
+    <div class="results-area" id="resultsArea">
+      <!-- Leaks Tab -->
+      <div id="tab-leaks" class="tab-content">
+        <div class="empty-state" id="leakEmpty">
+          <div class="empty-icon">🛡️</div>
+          <div class="empty-text">스캔을 시작하면 유출 탐지 결과가 여기에 표시됩니다.<br>Gemini AI가 문맥 기반으로 분석합니다.</div>
+        </div>
+        <div class="leak-grid" id="leakGrid"></div>
+      </div>
+
+      <!-- Pages Tab -->
+      <div id="tab-pages" class="tab-content" style="display:none">
+        <div class="empty-state" id="pagesEmpty">
+          <div class="empty-icon">🌐</div>
+          <div class="empty-text">수집된 텍스트가 여기에 표시됩니다.</div>
+        </div>
+        <div class="pages-content-list" id="pagesContentList" style="display:none;flex-direction:column;gap:8px;padding:12px;">
+          <div id="pagesBody"></div>
+        </div>
+      </div>
+
+      <!-- Keywords Tab -->
+      <div id="tab-keywords" class="tab-content" style="display:none">
+        <div class="empty-state" id="kwEmpty">
+          <div class="empty-icon">🔑</div>
+          <div class="empty-text">Gemini가 생성한 키워드가 여기에 표시됩니다.</div>
+        </div>
+        <div class="keywords-display" id="kwDisplay"></div>
+      </div>
+
+      <!-- History Tab -->
+      <div id="tab-history" class="tab-content" style="display:none">
+        <div class="history-list" id="historyList">
+          <div class="empty-state">
+            <div class="empty-icon">📁</div>
+            <div class="empty-text">이전 스캔 세션이 없습니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const API = '/api';
+let currentSession = null;
+let eventSource = null;
+let logCount = 0;
+let leakCounts = { HIGH: 0, MEDIUM: 0, LOW: 0, total: 0 };
+let pageCount = 0;
+let kwCount = 0;
+
+// ── UTILS ──
+
+// 엔터 키 이벤트 등록
+document.addEventListener("keydown", function(event) {
+  if (event.key === "Enter") {
+    startScan();
+  }
+});
+
+function startScan() {
+  // 실제 스캔 로직
+  document.getElementById("statusDot").className = "status-dot active";
+  document.getElementById("statusText").innerText = "스캔 중...";
+  console.log("스캔 시작!");
+}
+
+function now() {
+  return new Date().toLocaleTimeString('ko-KR', {hour12:false});
+}
+
+function addLog(type, message) {
+  const body = document.getElementById('logBody');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${now()}</span><span class="log-msg ${type}">${escHtml(message)}</span>`;
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
+  logCount++;
+  document.getElementById('logCount').textContent = logCount + ' events';
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateStat(id, val, cls) {
+  const el = document.getElementById(id);
+  el.textContent = val ?? 0;
+  if (cls) { el.className = 'stat-value ' + cls; }
+}
+
+// ── TABS ──
+function switchTab(name, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).style.display = '';
+  el.classList.add('active');
+  if (name === 'history') loadHistory();
+}
+
+// ── SCAN ──
+async function startScan() {
+  const topic = document.getElementById('topicInput').value.trim();
+  if (!topic) { alert('탐지 주제를 입력하세요.'); return; }
+
+  const kwEl = document.getElementById('customKeywords');
+  const kwText = kwEl ? kwEl.value.trim() : '';
+  const customKeywords = kwText ? kwText.split('\n').map(k => k.trim()).filter(Boolean) : [];
+
+  // Reset
+  leakCounts = { HIGH: 0, MEDIUM: 0, total: 0 };
+  pageCount = 0; kwCount = 0;
+  if (document.getElementById('leakGrid')) document.getElementById('leakGrid').innerHTML = '';
+  if (document.getElementById('leakEmpty')) document.getElementById('leakEmpty').style.display = 'flex';
+  if (document.getElementById('pagesBody')) document.getElementById('pagesBody').innerHTML = '';
+  if (document.getElementById('kwDisplay')) document.getElementById('kwDisplay').innerHTML = '';
+  ['Pages','Keywords','High','Medium','Leaks'].forEach(s => updateStat('stat'+s, 0));
+
+  // UI state
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').style.display = 'block';
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('scanLine').classList.remove('hidden');
+  setStatus('scanning', '스캔 중');
+  setStage(0);
+
+  addLog('stage', '🚀 스캔 시작: ' + topic);
+
+  try {
+    const res = await fetch(API + '/scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ topic, custom_keywords: customKeywords.length > 0 ? customKeywords : null })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      addLog('error', `서버 오류 ${res.status}: ${JSON.stringify(err)}`);
+      endScan();
+      return;
+    }
+    const data = await res.json();
+    if (!data.session_id) {
+      addLog('error', '세션 ID를 받지 못했습니다: ' + JSON.stringify(data));
+      endScan();
+      return;
+    }
+    currentSession = data.session_id;
+    addLog('info', '세션 ID: ' + currentSession);
+
+    // SSE 연결
+    eventSource = new EventSource(API + '/scan/' + currentSession + '/stream');
+    eventSource.onmessage = handleSSE;
+    eventSource.onerror = () => {
+      addLog('error', 'SSE 연결 오류');
+      endScan();
+    };
+  } catch(e) {
+    addLog('error', '서버 연결 실패: ' + e.message);
+    endScan();
+  }
+}
+
+function handleSSE(event) {
+  const msg = JSON.parse(event.data);
+  const type = msg.type;
+  const message = msg.message || '';
+
+  addLog(type, message);
+
+  if (type === 'stage') {
+    const stage = msg.stage || 1;
+    setStage(stage);
+    setProgress(stage, 4, message);
+  }
+
+  if (type === 'keywords' && msg.keywords) {
+    kwCount = msg.keywords.length;
+    updateStat('statKeywords', kwCount);
+    renderKeywords(msg.keywords);
+  }
+
+  if (type === 'page') {
+    pageCount++;
+    updateStat('statPages', pageCount);
+  }
+
+  // 수집 텍스트 표시
+  if (type === 'page_content' && msg.url) {
+    addPageContent(msg);
+  }
+
+  if (type === 'leak_found' && msg.leak) {
+    addLeakCard(msg.leak);
+    // 유출 텍스트 하이라이트
+    highlightLeakText(msg.leak);
+    leakCounts.total++;
+    if (msg.leak.risk_level === 'HIGH') leakCounts.HIGH++;
+    if (msg.leak.risk_level === 'MEDIUM') leakCounts.MEDIUM++;
+    if (msg.leak.risk_level === 'LOW') leakCounts.LOW++;
+    updateStat('statLeaks', leakCounts.total);
+    updateStat('statHigh', leakCounts.HIGH, 'high');
+    updateStat('statMedium', leakCounts.MEDIUM, 'medium');
+    updateStat('statLow', leakCounts.LOW, 'low');
+    document.getElementById('leakEmpty').style.display = 'none';
+  }
+
+  if (type === 'done') {
+    if (msg.results) renderFinalResults(msg.results);
+    endScan();
+    addLog('done', '✅ 스캔 완료!');
+    setStage(5); // all done
+  }
+
+  if (type === 'error') endScan();
+}
+
+function addLeakCard(leak) {
+  const grid = document.getElementById('leakGrid');
+  const score = Math.round((leak.risk_score || 0) * 100);
+  const types = (leak.leak_types || []).map(t => `<span class="leak-type-tag">${escHtml(t)}</span>`).join('');
+
+  const card = document.createElement('div');
+  card.className = `leak-card ${leak.risk_level}`;
+  card.innerHTML = `
+    <div class="leak-card-header">
+      <div>
+        <div class="leak-title">${escHtml(leak.title || '제목 없음')}</div>
+        <a class="leak-url" href="${escHtml(leak.url)}" target="_blank">${escHtml(leak.url)}</a>
+      </div>
+      <span class="risk-badge ${leak.risk_level}">${leak.risk_level}</span>
+    </div>
+    <div class="leak-summary">${escHtml(leak.summary || '')}</div>
+    <div class="leak-types">${types}</div>
+    <div class="score-bar">
+      <div class="score-fill ${leak.risk_level}" style="width:${score}%"></div>
+    </div>
+  `;
+  grid.prepend(card);
+}
+
+// 수집 텍스트 카드 추가
+function addPageContent(msg) {
+  const body = document.getElementById('pagesBody');
+  if (!body) return;
+  
+  const empty = document.getElementById('pagesEmpty');
+  if (empty) empty.style.display = 'none';
+  
+  const list = document.getElementById('pagesContentList');
+  if (list) list.style.display = 'flex';
+  
+  const row = document.createElement('div');
+  row.id = 'page-content-' + pageCount;
+  row.style = 'padding:12px;background:var(--surface2);border-radius:6px;margin:4px 0;';
+  row.innerHTML = `
+    <div style="font-size:11px;color:var(--accent);margin-bottom:6px;">📄 ${escHtml(msg.title || '제목 없음')}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px;word-break:break-all;"><a href="${escHtml(msg.url)}" target="_blank" style="color:var(--accent);text-decoration:underline;">${escHtml(msg.url)}</a></div>
+    <div class="page-text-content" style="font-size:12px;color:var(--text);line-height:1.6;white-space:pre-wrap;max-height:200px;overflow-y:auto;">${escHtml(msg.text_preview || '')}</div>
+  `;
+  body.appendChild(row);
+}
+
+// 유출 텍스트 하이라이트
+
+function highlightLeakText(leak) {
+  const url = leak.url || '';
+  const rows = document.querySelectorAll('#pagesBody > *');
+  rows.forEach(row => {
+    if (row.id && row.id.includes('page-content-')) {
+      const content = row.innerHTML || '';
+      if (content.includes(url.substring(0, 30))) {
+        row.style.border = '2px solid var(--accent2)';
+        row.style.background = 'rgba(255,60,110,0.1)';
+      }
+    }
+  });
+}
+
+function renderKeywords(keywords) {
+  const el = document.getElementById('kwDisplay');
+  const empty = document.getElementById('kwEmpty');
+  el.innerHTML = keywords.map((k, i) =>
+    `<span class="kw-tag" style="animation-delay:${i*0.05}s">${escHtml(k)}</span>`
+  ).join('');
+  empty.style.display = keywords.length ? 'none' : 'flex';
+}
+
+function renderFinalResults(results) {
+  // 수집 텍스트는 실시간으로 표시되므로 여기서는 빈칸으로 유지
+  const empty = document.getElementById('pagesEmpty');
+  if (empty) empty.style.display = 'none';
+}
+
+function endScan() {
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('scanLine').classList.add('hidden');
+  setStatus('inactive', '완료');
+}
+
+async function stopScan() {
+  if (currentSession) {
+    await fetch(API + '/scan/' + currentSession + '/stop', { method: 'DELETE' });
+    addLog('info', '⏹ 중지 요청됨');
+  }
+  endScan();
+}
+
+// ── PROGRESS ──
+function setStage(stage) {
+  for (let i = 1; i <= 4; i++) {
+    const dot = document.getElementById('dot' + i);
+    if (i < stage) dot.className = 'stage-dot done';
+    else if (i === stage) dot.className = 'stage-dot active';
+    else dot.className = 'stage-dot';
+  }
+}
+
+function setProgress(current, total, label) {
+  const pct = Math.round((current / total) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot ' + state;
+  document.getElementById('statusText').textContent = text;
+}
+
+// ── HISTORY ──
+async function loadHistory() {
+  try {
+    const res = await fetch(API + '/sessions');
+    const data = await res.json();
+    const sessions = data.sessions || [];
+    const list = document.getElementById('historyList');
+
+    if (!sessions.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📁</div><div class="empty-text">이전 스캔 세션이 없습니다.</div></div>';
+      return;
+    }
+
+    list.innerHTML = sessions.map(s => `
+      <div class="history-item" onclick="loadSessionResult('${s.id}')">
+        <div>
+          <div class="history-topic">${escHtml(s.topic || '알 수 없음')}</div>
+          <div class="history-meta">
+            ${new Date(s.started_at).toLocaleString('ko-KR')} · 
+            페이지 ${s.total_pages} · 
+            키워드 ${s.total_keywords} · 
+            상태: ${s.status}
+          </div>
+        </div>
+        <span class="history-badge ${s.total_leaks === 0 ? 'zero' : ''}">유출 ${s.total_leaks}건</span>
+      </div>
+    `).join('');
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+async function loadSessionResult(sessionId) {
+  addLog('info', '📁 세션 로드: ' + sessionId);
+  try {
+    const res = await fetch(API + '/session/' + sessionId);
+    const data = await res.json();
+
+    // Keywords
+    if (data.keywords) renderKeywords(data.keywords);
+
+    // Leaks
+    const grid = document.getElementById('leakGrid');
+    grid.innerHTML = '';
+    leakCounts = { HIGH: 0, MEDIUM: 0, total: 0 };
+    if (data.leaks && data.leaks.length) {
+      document.getElementById('leakEmpty').style.display = 'none';
+      data.leaks.forEach(l => {
+        addLeakCard({
+          url: l.url,
+          title: l.title || '제목 없음',
+          risk_level: l.risk_level,
+          risk_score: l.risk_score,
+          leak_types: JSON.parse(l.leak_types || '[]'),
+          summary: l.summary
+        });
+        leakCounts.total++;
+        if (l.risk_level === 'HIGH') leakCounts.HIGH++;
+        if (l.risk_level === 'MEDIUM') leakCounts.MEDIUM++;
+        if (l.risk_level === 'LOW') leakCounts.LOW++;
+      });
+    }
+
+    // Stats
+    if (data.session) {
+      updateStat('statPages', data.session.total_pages || 0);
+      updateStat('statKeywords', data.session.total_keywords || 0);
+    }
+    updateStat('statLeaks', leakCounts.total);
+    updateStat('statHigh', leakCounts.HIGH, 'high');
+    updateStat('statMedium', leakCounts.MEDIUM, 'medium');
+    updateStat('statLow', leakCounts.LOW, 'low');
+
+    renderFinalResults(data);
+
+    // Switch to leaks tab
+    switchTab('leaks', document.querySelector('.tab'));
+    document.querySelector('.tab').classList.add('active');
+  } catch(e) {
+    addLog('error', '세션 로드 실패: ' + e.message);
+  }
+}
+
+// ── INIT ──
+async function checkApiKey() {
+  try {
+    const res = await fetch(API + '/check-key');
+    const data = await res.json();
+    if (!data.has_key) {
+      addLog('error', '⚠️ GEMINI_API_KEY 환경변수가 없습니다!');
+    } else {
+      // addLog('info', '✅ GEMINI_API_KEY 확인됨: ' + data.key_preview);
+      addLog('info', '✅ GEMINI_API_KEY 확인됨: ');
+    }
+  } catch(e) {
+    addLog('error', '서버 연결 실패. 백엔드가 실행 중인지 확인하세요.');
+  }
+}
+
+// window.addEventListener('load', checkApiKey);
+</script>
+</body>
+</html>
