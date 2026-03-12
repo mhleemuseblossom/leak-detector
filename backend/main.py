@@ -138,10 +138,10 @@ async def run_scan_pipeline(session_id: str, topic: str, custom_keywords: Option
 
         if custom_keywords and len(custom_keywords) > 0:
             keywords = custom_keywords
-            await push("info", f"✅ 커스텀 키워드 {len(keywords)}개 사용")
+            await push("info", f"✅ 커스텀 키워드 {len(keywords)}개 사용: {keywords}")
         else:
             keywords = await generate_keywords(topic)
-            await push("info", f"✅ 키워드 {len(keywords)}개 생성됨")
+            await push("info", f"✅ 키워드 {len(keywords)}개 생성됨: {keywords}")
 
         await save_keywords(session_id, keywords)
         await push("keywords", "키워드 생성 완료", {"keywords": keywords})
